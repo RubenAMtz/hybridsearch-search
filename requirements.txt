@@ -5,3 +5,4 @@ azure-identity
 langchain==0.0.152
 python-dotenv
 openai
+chromabd

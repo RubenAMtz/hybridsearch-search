@@ -25,7 +25,7 @@ ml_client = MLClient(
 )
 
 # Define an endpoint name
-endpoint_name = "hybrid-search"
+endpoint_name = "hybrid-search-search"
 
 # create an online endpoint
 endpoint = ManagedOnlineEndpoint(
@@ -34,7 +34,7 @@ endpoint = ManagedOnlineEndpoint(
     auth_mode="key"
 )
 
-model = Model(path="embeddings\leyes_chromadb_512_40_ada_002_recursive\index\index_7f34d7a0-1444-407e-ac98-63e657161537.bin")
+model = Model(path="embeddings/leyes_chromadb_512_40_ada_002_recursive/index/index_7f34d7a0-1444-407e-ac98-63e657161537.bin")
 env = Environment(
     conda_file="hybrid-search.yaml",
     image="mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:latest",
@@ -46,11 +46,11 @@ blue_deployment = ManagedOnlineDeployment(
     model=model,
     environment=env,
     code_configuration=CodeConfiguration(
-        code="endpoint_deployment", scoring_script="scoring/search.py"
+        code=".", scoring_script="scoring/search.py"
     ),
     instance_type="Standard_F4s_v2",
     instance_count=1,
-    request_settings=OnlineRequestSettings(request_timeout_ms=1000)
+    request_settings=OnlineRequestSettings(request_timeout_ms=20000)
 )
 
 try: 

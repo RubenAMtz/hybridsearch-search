@@ -10,7 +10,7 @@ import logging
 # from keys_dev import openai_key, serpapi_key, hugging_face_token, cross_encoder_azureml_key, subscription_id, resource_group, workspace_name
 from langchain.llms import AzureOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
-
+import pathlib
 
 # from sentence_transformers import CrossEncoder
 from langchain.tools import BaseTool
@@ -18,8 +18,8 @@ from langchain.vectorstores import Chroma
 
 from dotenv import load_dotenv
 
-dotenv_path = f".env.dev"
-load_dotenv(dotenv_path=dotenv_path)
+env_path = pathlib.Path(f"../.env.dev")
+load_dotenv(dotenv_path=env_path)
 
 
 class CustomHybridSearch():

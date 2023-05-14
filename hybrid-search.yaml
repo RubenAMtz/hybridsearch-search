@@ -13,3 +13,5 @@ dependencies:
     - langchain==0.0.152
     - openai
     - python-dotenv
+    - chromadb
+    - tiktoken

@@ -1,26 +1,41 @@
 from inference_schema.schema_decorators import input_schema, output_schema
 from inference_schema.parameter_types.numpy_parameter_type import NumpyParameterType
 from inference_schema.parameter_types.standard_py_parameter_type import (
-    StandardPythonParameterType,
+    StandardPythonParameterType, 
 )
 import os
-import numpy as np
 import logging
 import pathlib
 import time
-from hybrid_search import CustomHybridSearchTool
+from hybrid_search import CustomHybridSearch
 from dotenv import load_dotenv
 from langchain.vectorstores import Chroma
 import openai
 from langchain.llms import AzureOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 
+import json  
+from typing import Any, List 
+from langchain.docstore.document import Document
+    
+class DocumentEncoder(json.JSONEncoder):  
+    def default(self, o: Any) -> Any:  
+        if isinstance(o, Document):  
+            return {  
+                "page_content": o.page_content,  
+                "metadata": o.metadata  
+            }  
+        elif isinstance(o, List):  
+            return [self.default(item) for item in o]  
+        return super().default(o)  
+
 
 def init():
 	db_dir = os.getenv("AZUREML_MODEL_DIR", "")
 	rd = pathlib.Path(f"{db_dir}")
 
-	load_dotenv()
+	env_path = pathlib.Path(f"../.env.dev")
+	load_dotenv(env_path)
 	openai_key = os.getenv("OPENAI_API_KEY")
 	openai.api_type = "azure"
 	openai.api_version = "2022-12-01"
@@ -33,9 +48,9 @@ def init():
 	logging.info(f"Contents of model dir {os.listdir(rd)}")
 	logging.info(f"Contents of model dir lvl 0 {os.listdir(rd.parents[0])}")
 	logging.info(f"Contents of model dir lvl 1 {os.listdir(rd.parents[1])}")
-	logging.info(f"Contents of model dir lvl 1 {os.listdir(rd.parents[2])}")
-	logging.info(f"Contents of model dir lvl 1 {os.listdir(rd.parents[2]/'rubenal'/'db_azure'/'leyes_chromadb_512_40_ada_002_recursive')}")
-	path_to_embeddings = f"{rd.parents[2]}" / "rubenal" /" db_azure" / "leyes_chromadb_512_40_ada_002_recursive"
+	logging.info(f"Contents of model dir lvl 2 {os.listdir(rd.parents[2])}")
+	logging.info(f"Contents of model dir lvl 2 {os.listdir(rd.parents[2] / 'search/embeddings/leyes_chromadb_512_40_ada_002_recursive')}")
+	path_to_embeddings = f"{rd.parents[2] / 'search/embeddings/leyes_chromadb_512_40_ada_002_recursive'}"
 	
 	db = Chroma(persist_directory=f"{path_to_embeddings}", embedding_function=embeddings, collection_name='abogado_gpt')
 	
@@ -46,7 +61,7 @@ def init():
 	logging.info("LLM loaded")
 	
 	global hybrid_search
-	hybrid_search = CustomHybridSearchTool(llm=llm, db=db, embeddings=embeddings, logger=logging, top_k_wider_search=62, top_k_reranked_search=4, verbose=True)
+	hybrid_search = CustomHybridSearch(llm=llm, db=db, embeddings=embeddings, logger=logging, top_k_wider_search=62, top_k_reranked_search=4, verbose=True)
 	logging.info("Hybrid search loaded")
 
 @input_schema(
@@ -56,23 +71,26 @@ def init():
             }
         })
 )
-@output_schema(output_type=StandardPythonParameterType( "abc" ))
+
+# @output_schema(output_type=StandardPythonParameterType( "abc" ))
 
 def run(data):
 
-    logging.info(type(data))
-    logging.info(data)
-    # create a list of tuples, where each tuple is "source sentence" and "sentence"
-    # the source sentence is repeated for each sentence in the list
-    # this is the format that the cross-encoder expects
-    start = time.time()
-    query = data["inputs"]["query"]
-    res = hybrid_search.run(query)
-    end = time.time()
-    logging.info(f"Time elapsed: {end - start}")
-    logging.info(f"Output res: {res}")
-    logging.info(f"Res dtype {type(res)}")
-    return res
+	logging.info(type(data))
+	logging.info(data)
+	# create a list of tuples, where each tuple is "source sentence" and "sentence"
+	# the source sentence is repeated for each sentence in the list
+	# this is the format that the cross-encoder expects
+	start = time.time()
+	query = data["inputs"]["query"]
+	res = hybrid_search.run(query)
+	end = time.time()
+	logging.info(f"Time elapsed: {end - start}")
+	logging.info(f"Output res: {res}")
+	logging.info(f"Res dtype {type(res)}")
+	# serialize the list of Document objects to json
+	res = json.dumps(res, cls=DocumentEncoder)  
+	return res
 
 
 # loading the model through the parent folder of the model
@@ -82,4 +100,8 @@ def run(data):
 # for input_schema, whatever the parameter name is, that is the name of the key in the json that is passed to the run function, for example:
 # input_schema(param_name="data", param_type=StandardPythonParameterType({"inputs": {"source_sentence": "puedo manejar borracho?", "sentences": ["manejar borracho", "manejar sobrio"]}}))
 # the key in the json is "data", so the run function will receive a json with a key "data" and the value will be the json that is passed to the input_schema function
-# {"data": {"inputs": {"source_sentence": "puedo manejar borracho?", "sentences": ["manejar borracho", "manejar sobrio"]}}}
+# {"data":{
+#     "inputs":{
+#         "query": "puedo manejar en sentido contrario?"
+#     }
+# }}
